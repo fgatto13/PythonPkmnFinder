@@ -6,7 +6,7 @@ from pygame import mixer
 from dataFetcher import *
 
 
-class pokeFinder(QWidget):
+class PokeFinder(QWidget):
     def __init__(self):
         super().__init__()
         self.pokeName = QLabel("Pokémon Name", self)
