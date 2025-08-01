@@ -3,7 +3,6 @@ import requests
 import tempfile
 
 POKEAPI_BASE_URL = "https://pokeapi.co/api/v2"
-CRY_BASE_URL = "https://play.pokemonshowdown.com/audio/cries"
 
 def get_pokemon_info(name: str) -> dict | None:
     url = f"{POKEAPI_BASE_URL}/pokemon/{name.lower()}"
@@ -27,14 +26,20 @@ def get_types(data: dict) -> list:
     except (KeyError, TypeError):
         return []
 
-def download_cry(name: str) -> str | None:
-    url = f"{CRY_BASE_URL}/{name.lower()}.mp3"
+def download_cry(data: dict, legacy: bool = False) -> str | None:
     try:
-        response = requests.get(url)
+        # Select either the latest or legacy cry URL
+        cry_url = data["cries"]["legacy"] if legacy else data["cries"]["latest"]
+
+        # Fetch the audio
+        response = requests.get(cry_url)
         response.raise_for_status()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+
+        # Save to a temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as tmp:
             tmp.write(response.content)
             return tmp.name
-    except requests.RequestException as e:
+
+    except (KeyError, requests.RequestException) as e:
         print(f"❌ Failed to download cry: {e}")
         return None

@@ -1,33 +1,44 @@
+from PyQt5.QtWidgets import (
+    QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
+    QGridLayout, QFrame
+)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QHBoxLayout
 from pygame import mixer
-
+import requests
 from dataFetcher import *
-
 
 class PokeFinder(QWidget):
     def __init__(self):
         super().__init__()
+        self.pokemon_data = None
         self.pokeName = QLabel("Pokémon Name", self)
         self.lineEdit = QLineEdit(self)
         self.sendButton = QPushButton("search", self)
         self.playButton = QPushButton("play", self)
-        self.spriteLabel = QLabel(self)  # this displays the QPixmap
+        self.spriteLabel = QLabel(self)
         self.logoImage = QLabel(self)
+        self.infoLayout = QGridLayout()
+        self.infoContainer = QFrame()
+
+        self.infoContainer.setLayout(self.infoLayout)
+
+        self.infoContainer.setObjectName("infoFrame")
+        self.spriteLabel.setObjectName("spriteLabel")
 
         self.initUI()
         self.play_background_music()
 
     def initUI(self):
+        self.setFixedSize(600, 800)
         self.lineEdit.setPlaceholderText("Input the name of the pokemon")
-
+        self.lineEdit.setFixedHeight(45)
+        self.pokeName.setFixedHeight(50)
         vbox = QVBoxLayout()
         hbox = QHBoxLayout()
         hbox.addWidget(self.lineEdit)
         hbox.addWidget(self.sendButton)
 
-        # Load and scale the logo
         pixmap = QPixmap("assets/logo.png")
         if not pixmap.isNull():
             scaled = pixmap.scaled(500, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -36,31 +47,23 @@ class PokeFinder(QWidget):
         else:
             self.logoImage.setText("⚠️ Logo not found")
 
-        # Add to layout
         vbox.addWidget(self.logoImage)
         vbox.addLayout(hbox)
         vbox.addWidget(self.pokeName)
-        vbox.addWidget(self.spriteLabel)
+
+        sprite_info_box = QHBoxLayout()
+        sprite_info_box.addWidget(self.spriteLabel)
+        sprite_info_box.addWidget(self.infoContainer)
+
+        vbox.addLayout(sprite_info_box)
         vbox.addWidget(self.playButton)
 
         self.setLayout(vbox)
-
         self.playButton.clicked.connect(self.play_sound)
         self.sendButton.clicked.connect(self.find_pokemon)
 
-        vbox = QVBoxLayout()
-        vbox.setAlignment(Qt.AlignCenter)
-
-        hbox = QHBoxLayout()
-        hbox.setAlignment(Qt.AlignCenter)
-
-        vbox.setSpacing(20)
-        vbox.setContentsMargins(30, 30, 30, 30)
-
-        self.spriteLabel.setFixedHeight(200)
         self.spriteLabel.setAlignment(Qt.AlignCenter)
 
-        # now for some styling
         self.setStyleSheet("""
             QWidget {
                 background-color: #9bbc0f;
@@ -70,9 +73,9 @@ class PokeFinder(QWidget):
             }
 
             QLabel {
-                font-size: 20px;
+                font-size: 18px;
                 border: 2px solid #0f380f;
-                padding: 10px;
+                padding: 6px;
                 border-radius: 8px;
                 background-color: #e0f8d0;
             }
@@ -96,7 +99,22 @@ class PokeFinder(QWidget):
                 background-color: #0f380f;
                 color: #e0f8d0;
             }
+
+            #infoFrame, #spriteLabel {
+                border: 5px double #0f380f;
+                padding: 10px;
+                background-color: #c4e66d;
+                border-radius: 8px;
+            }
+
+            QLabel[statBox="true"] {
+                font-size: 12px;
+                min-width: 120px;
+                qproperty-alignment: AlignCenter;
+            }
         """)
+        for btn in self.findChildren(QPushButton):
+            btn.setCursor(Qt.PointingHandCursor)
 
     def find_pokemon(self):
         name = self.lineEdit.text().strip().lower()
@@ -104,18 +122,18 @@ class PokeFinder(QWidget):
             self.pokeName.setText("Please enter a Pokémon name.")
             return
 
-        data = get_pokemon_info(name)
+        self.pokemon_data = get_pokemon_info(name)
 
-        if not data:
+        if not self.pokemon_data:
             self.pokeName.setText("Pokémon not found.")
             self.spriteLabel.clear()
             return
 
-        # Set the name
-        self.pokeName.setText(data["name"].capitalize())
+        self.pokeName.setText(
+            f"{self.pokemon_data['name'].capitalize()} #{self.pokemon_data['id']:03}"
+        )
 
-        # Get and display the sprite
-        sprite_url = get_sprite_url(data)
+        sprite_url = get_sprite_url(self.pokemon_data)
         if sprite_url:
             try:
                 response = requests.get(sprite_url)
@@ -129,25 +147,55 @@ class PokeFinder(QWidget):
         else:
             self.spriteLabel.clear()
 
+        self.update_info_panel()
+
     def play_sound(self):
         try:
-            tmp_path = download_cry(self.lineEdit.text())
+            if not self.pokemon_data:
+                print("❌ No Pokémon selected.")
+                return
+
+            tmp_path = download_cry(self.pokemon_data)
+            if not tmp_path:
+                print("❌ No cry found.")
+                return
 
             if not mixer.get_init():
                 mixer.init()
 
             cry_sound = mixer.Sound(tmp_path)
-            cry_sound.set_volume(0.8)  # Set cry volume before playing
-
-            # Use a separate channel so it plays *on top of* the background music
-            cry_channel = mixer.Channel(1)
-            cry_channel.play(cry_sound)
+            cry_sound.set_volume(0.8)
+            mixer.Channel(1).play(cry_sound)
 
         except Exception as e:
             print(f"❌ Failed to play cry: {e}")
 
     def play_background_music(self):
         mixer.init()
-        mixer.music.load("assets/background.mp3")  # your background music file
-        mixer.music.set_volume(0.1)  # optional: reduce volume
-        mixer.music.play(-1)  # -1 = infinite loop
+        mixer.music.load("assets/background.mp3")
+        mixer.music.set_volume(0.1)
+        mixer.music.play(-1)
+
+    def update_info_panel(self):
+        for i in reversed(range(self.infoLayout.count())):
+            widget = self.infoLayout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+
+        data = self.pokemon_data
+        types = ", ".join(t["type"]["name"].capitalize() for t in data["types"])
+        abilities = ", ".join(a["ability"]["name"].replace("-", " ").capitalize() for a in data["abilities"])
+        weight = data["weight"] / 10
+        exp = data["base_experience"]
+
+        lines = [
+            f"Type: {types}",
+            f"Abilities: {abilities}",
+            f"Weight: {weight:.1f} kg",
+            f"Base EXP: {exp}"
+        ]
+
+        for i, text in enumerate(lines):
+            label = QLabel(text)
+            label.setProperty("statBox", True)
+            self.infoLayout.addWidget(label, i, 0)
