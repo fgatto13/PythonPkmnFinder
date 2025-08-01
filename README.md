@@ -21,8 +21,8 @@ You can search for any Pokémon by name to view its sprite, stats, type, abiliti
 
 ## 🖼️ Screenshots
 <p float="left">
-    <img src="assets/screenshots/before.png" alt="before" width="135"/>
-    <img src="assets/screenshots/after.png" alt="after" width="135"/>
+    <img src="assets/screenshots/before.png" alt="before" />
+    <img src="assets/screenshots/after.png" alt="after" />
 </p>
 
 ---
