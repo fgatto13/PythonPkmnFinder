@@ -19,19 +19,24 @@ class PokeFinder(QWidget):
         self.spriteLabel = QLabel(self)
         self.logoImage = QLabel(self)
         self.infoLayout = QGridLayout()
+        self.statsLayout = QGridLayout()
         self.infoContainer = QFrame()
+        self.statsContainer = QFrame()
 
         self.infoContainer.setLayout(self.infoLayout)
+        self.statsContainer.setLayout(self.statsLayout)
 
         self.infoContainer.setObjectName("infoFrame")
         self.spriteLabel.setObjectName("spriteLabel")
+        self.statsContainer.setObjectName("statsFrame")
 
         self.initUI()
         self.play_background_music()
 
     def initUI(self):
-        self.setFixedSize(600, 800)
-        self.lineEdit.setPlaceholderText("Input the name of the pokemon")
+        self.setFixedSize(1000, 800)
+        self.logoImage.setFixedHeight(200)
+        self.lineEdit.setPlaceholderText("Input the name (or # of entry) of the pokemon")
         self.lineEdit.setFixedHeight(45)
         self.pokeName.setFixedHeight(50)
         vbox = QVBoxLayout()
@@ -41,7 +46,7 @@ class PokeFinder(QWidget):
 
         pixmap = QPixmap("assets/logo.png")
         if not pixmap.isNull():
-            scaled = pixmap.scaled(500, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            scaled = pixmap.scaled(300, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.logoImage.setPixmap(scaled)
             self.logoImage.setAlignment(Qt.AlignCenter)
         else:
@@ -54,6 +59,7 @@ class PokeFinder(QWidget):
         sprite_info_box = QHBoxLayout()
         sprite_info_box.addWidget(self.spriteLabel)
         sprite_info_box.addWidget(self.infoContainer)
+        sprite_info_box.addWidget(self.statsContainer)
 
         vbox.addLayout(sprite_info_box)
         vbox.addWidget(self.playButton)
@@ -66,7 +72,6 @@ class PokeFinder(QWidget):
 
         self.setStyleSheet("""
             QWidget {
-                background-color: #9bbc0f;
                 font-family: Courier New;
                 font-weight: bold;
                 color: #0f380f;
@@ -100,7 +105,7 @@ class PokeFinder(QWidget):
                 color: #e0f8d0;
             }
 
-            #infoFrame, #spriteLabel {
+            #infoFrame, #spriteLabel, #statsFrame {
                 border: 5px double #0f380f;
                 padding: 10px;
                 background-color: #c4e66d;
@@ -120,6 +125,9 @@ class PokeFinder(QWidget):
         name = self.lineEdit.text().strip().lower()
         if not name:
             self.pokeName.setText("Please enter a Pokémon name.")
+            self.pokemon_data = None  # clear data
+            self.spriteLabel.clear()
+            self.update_info_panel()  # 🔁 Clear previous info/stats
             return
 
         self.pokemon_data = get_pokemon_info(name)
@@ -127,6 +135,7 @@ class PokeFinder(QWidget):
         if not self.pokemon_data:
             self.pokeName.setText("Pokémon not found.")
             self.spriteLabel.clear()
+            self.update_info_panel()  # 🔁 Clear previous info/stats
             return
 
         self.pokeName.setText(
@@ -177,14 +186,21 @@ class PokeFinder(QWidget):
         mixer.music.play(-1)
 
     def update_info_panel(self):
-        for i in reversed(range(self.infoLayout.count())):
-            widget = self.infoLayout.itemAt(i).widget()
-            if widget:
-                widget.deleteLater()
+        # Clear previous info widgets
+        for layout in [self.infoLayout, self.statsLayout]:
+            for i in reversed(range(layout.count())):
+                widget = layout.itemAt(i).widget()
+                if widget:
+                    widget.deleteLater()
+
+        # If no Pokémon data, exit early
+        if not self.pokemon_data:
+            return
 
         data = self.pokemon_data
         types = ", ".join(t["type"]["name"].capitalize() for t in data["types"])
-        abilities = ", ".join(a["ability"]["name"].replace("-", " ").capitalize() for a in data["abilities"])
+        abilities = "\n".join(a["ability"]["name"].replace("-", " ").capitalize() for a in data["abilities"])
+        stats = {s["stat"]["name"]: s["base_stat"] for s in data["stats"]}
         weight = data["weight"] / 10
         exp = data["base_experience"]
 
@@ -199,3 +215,14 @@ class PokeFinder(QWidget):
             label = QLabel(text)
             label.setProperty("statBox", True)
             self.infoLayout.addWidget(label, i, 0)
+
+        aliases = {
+            "hp": "HP", "attack": "ATK", "defense": "DEF",
+            "special-attack": "SPA", "special-defense": "SPD", "speed": "SPE"
+        }
+
+        for i, (stat_name, value) in enumerate(stats.items()):
+            short_name = aliases.get(stat_name, stat_name.upper())
+            label = QLabel(f"{short_name}: {value}")
+            label.setProperty("statBox", True)
+            self.statsLayout.addWidget(label, i, 1)

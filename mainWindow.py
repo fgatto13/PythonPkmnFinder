@@ -7,7 +7,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Pokefinder")
         self.setGeometry(300, 300, 600, 400)
-        self.setStyleSheet("background-color: #a9a9a9;")
+        self.setStyleSheet("background-color: #a9a9a9; border: 3px solid black; border-radius: 12px;")
 
         self.finder = PokeFinder()
         self.setCentralWidget(self.finder)
