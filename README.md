@@ -20,10 +20,10 @@ You can search for any Pokémon by name to view its sprite, stats, type, abiliti
 ---
 
 ## 🖼️ Screenshots
-
-| Before Search | After Search |
-|---------------|--------------|
-| ![](assets/screenshots/before.png) | ![](assets/screenshots/after.png) |
+<p>
+    <img src="assets/screenshots/before.png" alt="before"/>
+    <img src="assets/screenshots/after.png" alt="after"/>
+</p>
 
 ---
 
