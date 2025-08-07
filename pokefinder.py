@@ -34,7 +34,7 @@ class PokeFinder(QWidget):
         self.play_background_music()
 
     def initUI(self):
-        self.setFixedSize(1000, 800)
+        self.setFixedSize(800, 800)
         self.logoImage.setFixedHeight(200)
         self.lineEdit.setPlaceholderText("Input the name (or # of entry) of the pokemon")
         self.lineEdit.setFixedHeight(45)
