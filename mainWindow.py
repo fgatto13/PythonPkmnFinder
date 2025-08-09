@@ -1,4 +1,4 @@
-# pokefinder_main.py
+# mainWindow.py
 from PyQt5.QtWidgets import QMainWindow
 from pokefinder import PokeFinder
 

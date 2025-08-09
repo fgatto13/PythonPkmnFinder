@@ -1,4 +1,6 @@
-# api.py
+# dataFetcher.py
+import random
+
 import requests
 import tempfile
 
@@ -14,9 +16,12 @@ def get_pokemon_info(name: str) -> dict | None:
         print(f"❌ Failed to fetch Pokémon info: {e}")
         return None
 
-def get_sprite_url(data: dict) -> str | None:
+def get_sprite_url(data: dict) -> tuple[str, int, str, int] | None:
     try:
-        return data["sprites"]["front_default"]
+        number = random.randrange(0, 2)
+        front_sprite = data["sprites"]["front_shiny" if number == 0 else "front_default"]
+        back_sprite = data["sprites"]["back_shiny" if number == 0 else "back_default"]
+        return front_sprite, number, back_sprite, number
     except (KeyError, TypeError):
         return None
 

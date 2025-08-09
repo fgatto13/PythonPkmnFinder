@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import (
     QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
     QGridLayout, QFrame
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPixmap
 from pygame import mixer
 import requests
@@ -11,7 +11,15 @@ from dataFetcher import *
 class PokeFinder(QWidget):
     def __init__(self):
         super().__init__()
+        # uninitialized data variables
+        self.current_pixmap = None
+        self.back_pixmap = None
+        self.front_pixmap = None
+        self.is_shiny = None
+        self.back_sprite_url = None
+        self.front_sprite_url = None
         self.pokemon_data = None
+        # visual elements
         self.pokeName = QLabel("Pokémon Name", self)
         self.lineEdit = QLineEdit(self)
         self.sendButton = QPushButton("search", self)
@@ -22,10 +30,10 @@ class PokeFinder(QWidget):
         self.statsLayout = QGridLayout()
         self.infoContainer = QFrame()
         self.statsContainer = QFrame()
-
+        # layout definition
         self.infoContainer.setLayout(self.infoLayout)
         self.statsContainer.setLayout(self.statsLayout)
-
+        # custom name labels for specific objects (for styling)
         self.infoContainer.setObjectName("infoFrame")
         self.spriteLabel.setObjectName("spriteLabel")
         self.statsContainer.setObjectName("statsFrame")
@@ -34,11 +42,14 @@ class PokeFinder(QWidget):
         self.play_background_music()
 
     def initUI(self):
-        self.setFixedSize(800, 800)
+        self.setFixedSize(800, 700)
         self.logoImage.setFixedHeight(200)
+
         self.lineEdit.setPlaceholderText("Input the name (or # of entry) of the pokemon")
         self.lineEdit.setFixedHeight(45)
+
         self.pokeName.setFixedHeight(50)
+
         vbox = QVBoxLayout()
         hbox = QHBoxLayout()
         hbox.addWidget(self.lineEdit)
@@ -69,6 +80,11 @@ class PokeFinder(QWidget):
         self.sendButton.clicked.connect(self.find_pokemon)
 
         self.spriteLabel.setAlignment(Qt.AlignCenter)
+
+        self.lineEdit.returnPressed.connect(self.find_pokemon)
+
+        for btn in self.findChildren(QPushButton):
+            btn.setCursor(Qt.PointingHandCursor)
 
         self.setStyleSheet("""
             QWidget {
@@ -118,8 +134,6 @@ class PokeFinder(QWidget):
                 qproperty-alignment: AlignCenter;
             }
         """)
-        for btn in self.findChildren(QPushButton):
-            btn.setCursor(Qt.PointingHandCursor)
 
     def find_pokemon(self):
         name = self.lineEdit.text().strip().lower()
@@ -142,23 +156,62 @@ class PokeFinder(QWidget):
             f"{self.pokemon_data['name'].capitalize()} #{self.pokemon_data['id']:03}"
         )
 
-        sprite_url = get_sprite_url(self.pokemon_data)
-        if sprite_url:
-            try:
-                response = requests.get(sprite_url)
-                response.raise_for_status()
-                pixmap = QPixmap()
-                pixmap.loadFromData(response.content)
-                self.spriteLabel.setPixmap(pixmap.scaled(200, 200, Qt.KeepAspectRatio))
-            except Exception as e:
-                print(f"Failed to load sprite: {e}")
-                self.spriteLabel.clear()
+        sprite_data = get_sprite_url(self.pokemon_data)
+        if sprite_data:
+            front_sprite_url, is_shiny, back_sprite_url, _ = sprite_data
+
+            # Store both sprites and flag
+            self.front_sprite_url = front_sprite_url
+            self.back_sprite_url = back_sprite_url
+            self.is_shiny = is_shiny
+
+            # Initially display front sprite
+            self.display_sprite(self.front_sprite_url)
+
+            # Connect the sprite label click to toggle sprites
+            self.spriteLabel.mousePressEvent = self.toggle_sprite
+            self.play_sound(self.is_shiny)
         else:
             self.spriteLabel.clear()
-
         self.update_info_panel()
 
-    def play_sound(self):
+    def toggle_sprite(self, event):
+        # Toggle sprite: If currently showing front, show back and vice versa
+        if not hasattr(self, 'current_pixmap') or self.current_pixmap.isNull():
+            return  # Do nothing if there's no sprite loaded.
+
+        # Toggle between front and back sprite URLs
+        current_sprite_url = self.front_sprite_url if self.current_pixmap == self.front_pixmap else self.back_sprite_url
+        new_sprite_url = self.back_sprite_url if current_sprite_url == self.front_sprite_url else self.front_sprite_url
+
+        self.display_sprite(new_sprite_url)
+
+    def display_sprite(self, sprite_url):
+        try:
+            response = requests.get(sprite_url)
+            response.raise_for_status()
+
+            # Load the image into a QPixmap
+            pixmap = QPixmap()
+            pixmap.loadFromData(response.content)
+
+            # Store the current pixmap
+            if sprite_url == self.front_sprite_url:
+                self.front_pixmap = pixmap
+            else:
+                self.back_pixmap = pixmap
+
+            self.current_pixmap = pixmap  # Store the current pixmap (front or back)
+
+            # Display the pixmap
+            self.spriteLabel.setPixmap(pixmap.scaled(200, 200, Qt.KeepAspectRatio))
+            # set the cursor to be a pointer
+            self.spriteLabel.setCursor(Qt.PointingHandCursor)
+        except Exception as e:
+            print(f"Failed to load sprite: {e}")
+            self.spriteLabel.clear()
+
+    def play_sound(self, is_shiny):
         try:
             if not self.pokemon_data:
                 print("❌ No Pokémon selected.")
@@ -176,10 +229,19 @@ class PokeFinder(QWidget):
             cry_sound.set_volume(0.8)
             mixer.Channel(1).play(cry_sound)
 
+            if is_shiny == 0:
+                shiny_sound = mixer.Sound("assets/shiny.mp3")
+                shiny_sound.set_volume(1)
+
+                # Play shiny sound after the cry ends (non-blocking)
+                cry_duration_ms = int(cry_sound.get_length() * 1000)
+                QTimer.singleShot(cry_duration_ms, lambda: mixer.Channel(1).play(shiny_sound))
+
         except Exception as e:
             print(f"❌ Failed to play cry: {e}")
 
-    def play_background_music(self):
+    @staticmethod
+    def play_background_music():
         mixer.init()
         mixer.music.load("assets/background.mp3")
         mixer.music.set_volume(0.1)
